@@ -62,7 +62,7 @@ class Parser:
         
         if verbose == True:
             
-            to_save = '# Sequence Processing File\n\n# Generated {0}\n\n# This sequence can be modeled using SeqPGUI or SeqPCLI\n'.format(time.asctime())
+            to_save = '# Sequence Processing File\n\n# Generated {0}\n\n# This sequence can be modeled using SeqGUI.py\n'.format(time.asctime())
             
             if len(names) > 0:
                 to_save += '\n# Original names for sequences: '
@@ -73,60 +73,45 @@ class Parser:
                     to_save += name
                     not_first = True
             
+            to_save += '\n'
+            
+            descriptions = {}
+            unit_types = {'N': 'Translation','R': 'Restriction','L': 'Ligation','F': 'Transcription Factor',
+                          'M': 'Mutation', 'E': 'Sequence Export','I': 'Sequence Import','O': 'Copy',
+                          'Q': 'Sequence Protection','D': 'Sequence Degradation','Z': 'Cell Disintegration','U': 'Tag Transport',
+                          'V': 'Substance Conversion','Y': 'Cell Splitting'}
+            
+            #Create regular expression pattern
+            #matching for unit description
+            pattern = r'([NRLFMEIOQDZUVY])'               #unit type [0]
+            pattern += r'([\-]*\d+[\.]?\d*)'            #max action parameter (can be floating point) [1]
+            pattern += r'/?(\d*[\.]?\d*)'               #optional energy parameter after / (can be floating point) [2]
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags in () [3]
+            pattern += r'\[[GTACXP0-9]*\]'              #contained sequence in [] 
+            pattern += r'([GTACX\!]*)'                  #optional target sequence [4]
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags targets [5] (or starting substances for conversion unit V)
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags resulting substances (only used by conversion unit) [6]
+            pattern += r'([0-9]+)'                      #life parameter [7]
+            
+            regex = re.compile(pattern)
+            new_units = regex.finditer(self.sequence)
+            
+            for unit in new_units:
+                params = unit.groups()
+                desc = '\n\n#{0} Unit, a: {1}, l: {2}\n'.format(unit_types[params[0]], params[1], params[7])
+                end_pos = unit.start() + 2
+                for i in range(len(params)):
+                    end_pos += len(params[i])
+                    
+                descriptions[unit.start()] = desc
+                descriptions[end_pos] = '\n'
+                
             for pos in range(len(self.sequence)):
-                if self.sequence[pos] == 'P':
-                    to_save += '\n\n# Promoter \nP'
-                    
-                elif self.sequence[pos] == 'S':
-                    to_save += '\n\n# Translation Stop \nS\n'
-                    
-                elif self.sequence[pos] == 'M':
-                    to_save += '\n\n# Mutation Unit \nM'
-                    
-                elif self.sequence[pos] == 'N':
-                    to_save += '\n\n# Translation Unit \nN'
-                    
-                elif self.sequence[pos] == 'R':
-                    to_save += '\n\n# Restriction Unit \nR'
-                    
-                elif self.sequence[pos] == 'L':
-                    to_save += '\n\n# Ligation Unit \nL'
-                
-                elif self.sequence[pos] == 'I':
-                    to_save += '\n\n# Import Unit \nI'
-                    
-                elif self.sequence[pos] == 'Q':
-                    to_save += '\n\n# Sequence Protection Unit \nQ'
-                    
-                elif self.sequence[pos] == 'D':
-                    to_save += '\n\n# Degradation Unit \nD'
-                    
-                elif self.sequence[pos] == 'E':
-                    to_save += '\n\n# Export Unit \nE'
-                
-                elif self.sequence[pos] == 'Z':
-                    to_save += '\n\n# Cell Disintegration Unit \nZ'
-                    
-                elif self.sequence[pos] == 'O':
-                    to_save += '\n\n# Copy Unit \nO'
-                    
-                elif self.sequence[pos] == 'F':
-                    to_save += '\n\n# Transcription Factor \nF'
-                    
-                elif self.sequence[pos] == 'U':
-                    to_save += '\n\n# Transport Unit \nU'
-                
-                elif self.sequence[pos] == 'Y':
-                    to_save += '\n\n# Cell Splitting Unit \nY'
-                    
-                elif self.sequence[pos] == 'V':
-                    to_save += '\n\n# Conversion Unit \nV'
-                    
-                elif self.sequence[pos] == ';':
-                    to_save += '\n\n# Beginning/End of strand \n;\n'
-                    
-                else:
-                    to_save += self.sequence[pos]
+                if pos in descriptions.keys():
+                    to_save += descriptions[pos]
+                if self.sequence[pos] == ';':
+                    to_save += '\n'
+                to_save += self.sequence[pos]
         else:   
             to_save = self.sequence
                                                                                     
@@ -356,7 +341,8 @@ class Parser:
             raise SequenceWarning(self.sequence, warnings)
         
     def sequence_info(self):
-        '''Returns a formated string containing information
+        '''!!!FIX: This is very broken...
+        Returns a formated string containing information
         about the content of current sequence.'''
         
         #Find all units in sequence

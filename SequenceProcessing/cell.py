@@ -1492,9 +1492,7 @@ class Cell(object):
         
         if len(self.sequence) > 0:
             resp_str += '\nSequence:\n'
-            resp_str += self.sequence
-            
-        resp_str += '\n-------------------------------------------------------------\n'
+            resp_str += self.sequence + '\n'
         
         return resp_str
     
