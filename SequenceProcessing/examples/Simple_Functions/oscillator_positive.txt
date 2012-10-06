@@ -1,0 +1,32 @@
+# Example for a positive Oscillator in SeqP 0.1
+# This example shows how instable positive oscillators are:
+# As soon as you add some noise the cells usually die...
+
+;
+
+# An initial excess of TF 1 to start the cycle
+F 1 [] !TTT 1
+
+# Some housekeeping (const number of translation units)
+P1
+N10[]3
+S
+
+# The oscillating cycle
+
+# Module 1
+P AAA
+F1 [] !TTT 1
+S
+
+# Module 2
+P TTT
+F1 [] !CCC 1
+S
+
+# Module 3
+P CCC
+F1 [] !CACC 1
+S
+
+;

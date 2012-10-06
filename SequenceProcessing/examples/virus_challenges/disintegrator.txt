@@ -1,0 +1,5 @@
+# Disintegrator
+
+# Prepare before the wave arrives!
+
+;N40[]1SP20U5(_)[](_)25Z1(_)[]25;

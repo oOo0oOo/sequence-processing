@@ -1,0 +1,43 @@
+# Example for Oscillator in SeqP 0.1
+
+;
+
+# An initial excess of TF 1
+F -3 [] !TTT 2
+
+# Some housekeeping (const number of translation units)
+P1
+N10[]3
+S
+
+# The oscillating cycle
+
+# "Modules" consists of:
+# - specific constant promoter, that can be repressed
+# - transcription factor repressing the promoter of another "module"
+# - optional other unit to carry out some work in a specific phase of the cycle
+
+# Module 1
+P3 AAA
+F-3 [] !TTT 2
+S
+
+# Module 2
+P3 TTT
+F-3 [] !CCC 2
+# extra restriction unit
+R 2 [] GGA!AGG 2
+S
+
+# Module 3
+P3 CCC
+F-3 [] !AAA 2
+# extra ligation unit
+L 2 [] GGA!AGG 2
+S
+
+;;
+
+# Sequence that gets cut and ligated over time by extra units
+AGGGGAAGGGGAAGGGGAAGGGGAAGGGGAAGGGGAAGGGGA
+;

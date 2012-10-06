@@ -1,0 +1,12 @@
+# Export import example
+
+;
+
+# Export unit
+E 5 [] CCC! 3
+
+# Import unit
+I 5 [] AAGGAA 4
+
+# Sequence that gets copied, exported and then imported
+CCCTTTAAGGAA;

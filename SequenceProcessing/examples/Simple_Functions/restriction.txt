@@ -1,0 +1,32 @@
+# Sequence Processing 0.1
+
+# Example sequence
+
+# Note: all lines starting with # and all whitespace will be ignored
+
+# Restriction example sequence
+
+;
+
+# Restriction unit
+# R : Starts the definition of a restriction unit.
+# 1 : Maximal number of actions per round.
+# [] : Specify known sequence between square brackets.
+#		In this case there is no known sequence information
+# CX!GG : The target sequence (unit cuts ..CCGG.. into ..CC;GG..)
+#		X stands for G, T, A, C or X
+# 5 : Number of rounds the unit can act
+
+R 1 [] CX!GG 5
+
+# First sequence to cut
+AAACCGGAAA
+
+# Second sequence to cut
+AAACAGGAAA
+
+# End of sequence
+;
+
+
+

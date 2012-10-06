@@ -1,0 +1,30 @@
+#
+
+#Sequence start
+;XXXXXGATCCTAGA
+
+#Translation Unit
+N2 [] 10
+
+PATTACA
+
+#Transcription factor
+F5 [GATACA] GA!TTACA 5
+
+#Stop codon
+S
+
+PGATTACA
+
+#Restriction enzyme
+R5 [GAATACA] GA!XT!ACA 4
+
+#Stop
+S
+
+#End of the plasmid
+GATTACA
+GAATACA
+GACTACA
+;
+

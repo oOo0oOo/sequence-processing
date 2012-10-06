@@ -1,0 +1,5 @@
+# Energy Destructor
+
+# Get an energy dependent cell going alongside this bastard
+
+;P2N3[]3U5(_)[](_)50V100(_)[](energy,energy)()50;

@@ -1,0 +1,13 @@
+# Copy example sequence
+# Note how the copy unit creates blunt ends from an overlapping end
+
+;
+
+#Copy unit
+O 2 [] AA!CC 3
+
+# Sequence to copy
+AACCTTTTGGG
+
+# Last three letters (GGG) are single stranded
+;3

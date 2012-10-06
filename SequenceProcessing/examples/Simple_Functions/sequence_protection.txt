@@ -1,0 +1,36 @@
+
+# Example for a sequence protection unit
+
+# prohibits active site of all other enzymes, tranlsation also stops
+# when it encounters a protected sequence
+
+# It is important to note that the actions/round parameter for the protection unit
+# defines the number of targets the unit can bind per round.
+# These targets get randomly chosen every round from all available targets on the sequence
+# The target positions are then blocked for this round for any number of units.
+
+# in this example the enzymes can act on the when the protection unit gets degraded (after 5 rounds)
+;
+
+# Sequence Protection Unit
+Q 2 [] GGGGTTTT 5
+
+# A promoter to show that translation is also blocked
+P1
+
+#Translation unit
+N2[]1
+
+#The target sequence
+GGGGTTTT
+
+# Some other units (not working in beginning)
+# when they start working the cells sequence grows exponentialy
+# (unless you uncomment the restriction unit)
+
+# R 5 [] X!GG!GTT 10
+
+O 10 [] G!GTT 10
+E 10 [] X!GGGTT 10
+F 10 [] X!GGGTT 10
+;

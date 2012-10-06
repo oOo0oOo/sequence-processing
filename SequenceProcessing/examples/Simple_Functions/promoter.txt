@@ -1,0 +1,22 @@
+
+# This example shows a cell which maintains a constant number of 
+# translation and export units.
+# It keeps exporting the same sequence over time
+
+;
+
+# Promoter (gets expressed once every round if enough translation units are present)
+P 1
+
+# Translation unit, gets created every round anew
+N 10 [] 1
+
+# Export unit, gets created every round anew
+E 1 [] CC!GG 1
+
+XXGG
+
+# Sequence to be exported
+CCGGTTTTAA
+
+;

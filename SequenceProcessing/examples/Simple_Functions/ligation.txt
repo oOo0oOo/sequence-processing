@@ -1,0 +1,11 @@
+#Ligation example
+;
+#Ligation units
+L3[]X!X10
+L3[]X!XX!X10
+S
+
+#Strands to be ligated
+AGTA;2;2AAGA;2;2GAG;;2TAG;;2
+AAAA;2;2AAAA;2;2AAAA;;AAAA;2;AAAA;2;GGCT;;
+AAAA;;GGGG;;CCCC;;TTTT;;AAAA;;GGGG;;CCCC;;TTTT;

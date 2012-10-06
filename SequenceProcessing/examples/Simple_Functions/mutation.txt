@@ -1,0 +1,28 @@
+#Mutation example for SeqP
+
+#Strand begin
+;P1
+
+N10[]3
+N10[]3
+N10[]3
+
+
+#Powerful mutation units + Stop codon
+M8 [] 3
+M8 [] 3
+M8 [] 3
+S
+
+#Sequence to be mutated
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA;
+
+
+
