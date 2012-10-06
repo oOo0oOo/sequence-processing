@@ -169,45 +169,78 @@ class Cell(object):
             adress.pop(0)
             self.cells[adress[0]].change_parameters(tuple(adress), sample_mode, sigma_factor, subs_const, cont, interact_with_subcells)
             
-    def write_log(self, cont = False):
-        #write log in cell and all sub cells
-        #cast lists of unit and substance values (otherwise it will be dynamic
-        #and the values would always reflect the same round...
+    def add_subs(self, substances):
+        if type(substances) == tuple:
+            for substance in substances:
+                self.substances[self.subs_count] = substance
+                self.subs_count += 1
+        elif (type(substances) == str) or (type(substances) == unicode):
+            self.substances[self.subs_count] = substances
+            self.subs_count += 1
+            
+    def find_tags(self, tags, substances = True, units = False, remove = False, use_partner = False):
+        '''First checks if all the substances are present,
+        then removes the substances from the list. 
+        Returns True if successful and False if not.
+        also returns True when empty tuple is passed...'''
         
-        units = list(self.units.values())
-        substances = list(self.substances.values())
-        self.log[self.rounds] = {'units': units, 'energy': self.has_energy(total = True), 'sequence': self.sequence, 'substances': substances}
+        subs_found = []
+        units_found = []
+        objects_to_return = []
         
-        if cont:
-            for cell in self.cells.keys():
-                self.cells[cell].write_log(cont = True)
-                
-    def save_cell_log_csv(self, filename, adress = False):
-        '''Adress has to contain the current cell id as first parameter'''
-        
-        if adress != False:
-            #redirect call to subcell 
-            cell = self.get_subcell_by_adress(adress)
-            cell.save_cell_log_csv(filename, adress = False)
+        if use_partner:
+            mixed_subs = self.partner_substances.items()
+            mixed_units = self.partner_units.items()
         else:
-            f = open(filename, 'wt')
-            try:
-                writer = csv.writer(f, delimiter = '\t')
-                #set titles of columns
-                writer.writerow( ('Round', 'Length Sequence', 'Energy', '#Substances','#F', '#N','#R','#L','#M','#E','#I','#O','#Q','#D','#Z','#U','#V','#Y','Sequence'))
+            mixed_subs = self.substances.items()
+            mixed_units = self.units.items()
+            
+        random.shuffle(mixed_subs)
+        random.shuffle(mixed_units)
+        
+        for tag in tags:
+            found = False
+            tag = tag.replace('*', '[a-z_\*]')
+            tag = '^' + tag + '$'
+            reg = re.compile(tag)
+            
+            #Look for substances
+            if substances:
+                for ind in range(len(mixed_subs)):
+                    key, sub = mixed_subs[ind]
+                    res = reg.search(sub)
+                    if res:
+                        subs_found.append(key)
+                        objects_to_return.append((key, sub))
+                        del mixed_subs[ind]
+                        found = True
+                        break
+                     
+            #if substance is not found search for unit
+            if found == False and units == True:
+                for ind in range(len(mixed_units)):
+                    key, unit = mixed_units[ind]
+                    for sub_tag in unit['tags']:
+                        res = reg.search(sub_tag)
+                        if res:
+                            units_found.append(key)
+                            objects_to_return.append((key, unit))
+                            del mixed_units[ind]
+                            found = True
+                            break
+                    if found:
+                        break
                 
-                for rnd, entry in self.log.items():
-                    #Count number of ocurences of each unit type
-                    u = Counter([unit['type'] for unit in entry['units']])
-                    
-                    #write data in column
-                    writer.writerow((str(rnd), len(entry['sequence']), entry['energy'], len(entry['substances']), 
-                                         u['F'], u['N'], u['R'], u['L'], u['M'], u['E'], 
-                                         u['I'], u['O'], u['Q'], u['D'], u['Z'], u['U'], u['V'], u['Y'], entry['sequence']))
-                    
-            finally:
-                f.close()
-    
+        if len(tags) == len(units_found) + len(subs_found):
+            if remove and not use_partner:
+                for sub in subs_found:
+                    del self.substances[sub]
+                for unit in units_found:
+                    del self.units[unit]   
+            return tuple(objects_to_return)
+        else:
+            return False
+        
     def run_all(self):
         '''Run actions from the cell and all sub cells in random order'''
         
@@ -222,6 +255,124 @@ class Cell(object):
                 
         self.degrade_units()
         self.write_log(cont = True)
+        
+    def get_requested_reads(self):
+        '''Find all positions that are requested for translation this round.'''
+        requests, neg_requests = [], []
+        #find number of possible translations by adding up all actions from all translation units
+        tot_tr = 0
+        tr_list = [id for id in self.units.keys() if self.units[id]['type'] == 'N']
+        tf_list = [id for id in self.units.keys() if self.units[id]['type'] == 'F']
+        
+        for tr in tr_list:
+            tot_tr += self.sample_probability(self.units[tr]['action'])
+        
+        if tot_tr > 0:
+            #Translations
+            #Find all requestet translations
+            for unit in tf_list:
+                max_action = self.sample_probability(self.units[unit]['action'])
+                
+                #The target sequence without !
+                target = self.units[unit]['target'].replace('!', '')
+                
+                occurences = self.find_occurences('prom', 0, len(self.sequence), target, abs(max_action))
+                
+                for occ in occurences:
+                    if max_action > 0:
+                        requests.append(occ)
+                    else:
+                        neg_requests.append(occ)
+            
+            #Find constitutive promoters
+            pattern = 'P([0-9]+\.?[0-9]*)'
+            
+            regex = re.compile(pattern)
+            occurences = [(m.start(), m.groups()[0]) for m in regex.finditer(self.sequence)]
+            
+            for occ in occurences:
+                tr_start = occ[0] + len(occ[1]) + 1
+                #add found const prom to request list
+                max_tr = self.sample_probability(float(occ[1]))
+                for i in range(max_tr):
+                    requests.append(tr_start)
+                    
+            #remove negative regulated positions from the positive list if they are present
+            for req in neg_requests:
+                if req in requests:
+                    ind = requests.index(req)
+                    requests.pop(ind)
+                    
+            # pop starts that are protected
+            todel = []
+            for i in range(len(requests)):
+                if self.pos_protected(requests[i]):
+                    todel.append(requests[i])
+            
+            for tod in todel:
+                requests.pop(requests.index(tod))
+                   
+            random.shuffle(requests)
+            if len(requests) > tot_tr:
+                requests = requests[:tot_tr]
+                
+        return requests
+        
+    def start_round(self):
+        '''Initializes the round, withdrawing life from units.
+        returns a list of actions that are requested this round'''
+        
+        self.rounds += 1
+        
+        #reset target sites
+        self.reset_target()
+        
+        #reset protected sites
+        self.reset_protected()
+        
+        #add constant substances to cell (also energy)
+        new_tags = []
+        for tag,amount in self.subs_const.items():
+            for i in range(amount):
+                new_tags.append(tag)
+        self.add_subs(tuple(new_tags))
+        
+        #Withdraw life from units
+        for unit in self.units.keys():
+            self.units[unit]['life'] -= 1
+        
+        action_list = []
+        
+        #Collect all actions for most units and new_translations in random order
+        #Do NOT use transcription factors, protection units, translation units
+        #as they are handled separately.
+        for unit_id in self.units.keys():
+            unit_type = self.units[unit_id]['type']
+            if unit_type not in ('F', 'N', 'Q'):
+                max_action = self.sample_probability(self.units[unit_id]['action'])
+                for i in range(abs(max_action)):
+                    action_list.append([[self.id], unit_type, unit_id])
+        
+        #Get all requested translations
+        read_ind = self.get_requested_reads()
+        if read_ind:
+            for ind in read_ind:
+                action_list.append([[self.id], 'read', ind])
+        
+        #update dict of all translation units and their actions
+        tr_list = [id for id in self.units.keys() if self.units[id]['type'] == 'N']
+        self.tr_count = {}
+        for tr in tr_list:
+            self.tr_count[tr] = self.units[tr]['action']
+        
+        #start round in ALL sub cells
+        for cell in self.cells.keys():
+            sub_action_list = self.cells[cell].start_round()
+            for adress, act_type, param in sub_action_list:
+                adress.insert(0, self.id)
+                action_list.append([adress, act_type, param])
+        
+        return action_list
     
     def perform_action(self, action, top_sequence, top_units, top_subs):
         '''Performs an action or redirects it to sub cell'''
@@ -398,63 +549,185 @@ class Cell(object):
                     self.cells[c_id].add_subs(tr['subs_export'])
                 if tr['subs_import'] != None:
                     del self.cells[c_id].substances[tr['subs_import']]
+        
+    def find_occurences(self, template, start, stop, target, maxi):
+        '''finds sequence (only sequence data no enzyme target sites)
+        finds maximal number of occurences, fills up to maximum'''
+        
+        target = target.replace('X', '[GATCX]')
+        
+        if target[len(target)-1] == ';':
+            target += '([^0-9]|$)'
+        
+        target_seq = lambda x: self.pos_target(x, 'own')
+        seq = self.sequence
+        
+        if template == 'prom':
+            target = '(P[0-9]*\.?[0-9]*)' + target
+        
+        elif template == 'ext':
+            seq = self.partner_sequence
+            target_seq = lambda x: self.pos_target(x, 'ext')
+        
+        results = re.compile(target).finditer(seq[start:stop])
+        
+        occ = []
+        for res in results:
+            pos = res.start() + start
+            if template == 'prom':
+                pos += len(res.groups()[0])
+                
+            if not target_seq(pos):
+                occ.append(pos)
+        
+        #Limit/extend the number of result until max_action is reached  
+        choices = []
+        if len(occ)>0:
+            random.shuffle(occ)
+            if maxi < len(occ):
+                choices = occ[:maxi]
+            else:
+                #Add random elements until max is reached
+                choices = occ
+                missing = maxi - len(choices)
+                while missing > 0:
+                    if len(occ) < missing:
+                        choices += occ
+                    else:
+                        choices += occ[:missing]
+                    missing = maxi - len(choices)
             
-    def start_round(self):
-        '''Initializes the round, withdrawing life from units.
-        returns a list of actions that are requested this round'''
+        return choices
+    
+    def read_seq(self, start = 0, energy_per_unit = 0, adress = False):
+        '''Parse a sequence into unit(s) and add to pool'''
         
-        self.rounds += 1
+        if adress != (self.id,) and adress != False:
+            adress = list(adress)
+            adress.pop(0)
+            try:
+                self.cells[adress[0]].read_seq(start = start, energy_per_unit = energy_per_unit, adress = tuple(adress))
+                return True
+            except KeyError:
+                #cell isn't here anymore
+                return False
+        else:
+            try:
+                l = len(self.sequence)
+                if l == 0:
+                    return False
+            except IndexError:
+                return False
+            
+            try:   
+                while self.sequence[start] == ';' and start != len(self.sequence) -1:
+                    start += 1
+            except IndexError:
+                return False
+            
+            #Find stop sign 'S' or end of sequence ';'
+            sequence = self.sequence[start:]
+            
+            try:
+                stop = sequence.index('S') + start
+                seq_end = sequence.index(';') + start
+                if seq_end < stop:
+                    stop = seq_end
+            except ValueError:
+                try:
+                    stop = sequence.index(';') + start
+                except ValueError:
+                    stop = len(self.sequence)
+                    
+            # Check if any position between start and stop is protected,
+            #if so this moves the stop up to that position
+            
+            for test in range(start, stop):
+                if self.pos_protected(test):
+                    stop = test
+                    break
+                    
+            sequence = self.sequence[start:stop]
+            #Create regular expression pattern
+            #matching for unit description
+            pattern = r'([NRLFMEIOQDZUVY])'               #unit type [0]
+            pattern += r'([\-]*\d+[\.]?\d*)'            #max action parameter (can be floating point) [1]
+            pattern += r'/?(\d*[\.]?\d*)'               #optional energy parameter after / (can be floating point) [2]
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags in () [3]
+            pattern += r'\[[GTACXP0-9]*\]'              #contained sequence in [] 
+            pattern += r'([GTACX\!]*)'                  #optional target sequence [4]
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags targets [5] (or starting substances for conversion unit V)
+                                                        #this also serves as conditional substances for all except V or U
+            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags resulting substances (V) [6]
+                                                        #or conditional substances for U
+            pattern += r'([0-9]+)'                      #life parameter [7]
         
-        #reset target sites
-        self.reset_target()
-        
-        #reset protected sites
-        self.reset_protected()
-        
-        #add constant substances to cell (also energy)
-        new_tags = []
-        for tag,amount in self.subs_const.items():
-            for i in range(amount):
-                new_tags.append(tag)
-        self.add_subs(tuple(new_tags))
-        
-        #Withdraw life from units
-        for unit in self.units.keys():
-            self.units[unit]['life'] -= 1
-        
-        action_list = []
-        
-        #Collect all actions for most units and new_translations in random order
-        #Do NOT use transcription factors, protection units, translation units
-        #as they are handled separately.
-        for unit_id in self.units.keys():
-            unit_type = self.units[unit_id]['type']
-            if unit_type not in ('F', 'N', 'Q'):
-                max_action = self.sample_probability(self.units[unit_id]['action'])
-                for i in range(abs(max_action)):
-                    action_list.append([[self.id], unit_type, unit_id])
-        
-        #Get all requested translations
-        read_ind = self.get_requested_reads()
-        if read_ind:
-            for ind in read_ind:
-                action_list.append([[self.id], 'read', ind])
-        
-        #update dict of all translation units and their actions
-        tr_list = [id for id in self.units.keys() if self.units[id]['type'] == 'N']
-        self.tr_count = {}
-        for tr in tr_list:
-            self.tr_count[tr] = self.units[tr]['action']
-        
-        #start round in ALL sub cells
-        for cell in self.cells.keys():
-            sub_action_list = self.cells[cell].start_round()
-            for adress, act_type, param in sub_action_list:
-                adress.insert(0, self.id)
-                action_list.append([adress, act_type, param])
-        
-        return action_list
-        
+            regex = re.compile(pattern)
+            new_units = regex.finditer(sequence)
+            
+            #little helper function to parse the target content into a 
+            #tuple of strings
+            def parse_tags(tag):
+                pattern = r'([a-z_\*]+)'
+                found_tags = re.compile(pattern).finditer(tag)
+                all_tags = []
+                for t in found_tags:
+                    all_tags.append(t.groups()[0])
+                    
+                return tuple(all_tags)
+            
+            units_translated = 0
+            #Add new units to pool and respective lists
+            for unit in new_units:
+                #Check if enough energy is present to translate next unit
+                if self.has_energy(total = True) - (energy_per_unit * (units_translated+1)) >= 0:
+                    params = unit.groups()
+                    
+                    action = float(params[1])
+                    life = int(params[7])
+                    tags = parse_tags(params[3])
+                    target = params[4]
+                    u_type = params[0]
+                    needs = parse_tags(params[5])
+                    
+                    #negative parameters only allowed for transport (U) and Transcription Factor (F)
+                    if u_type not in ('F', 'U'):
+                        action = abs(action)
+                    
+                    if len(params[2]) == 0:
+                        energy = 0
+                    else:
+                        energy = float(params[2])
+                    
+                    if u_type in ('I', 'Q', 'D'):
+                        try:
+                            target = target.replace('!', '')
+                        except:
+                            pass
+                    
+                    elif u_type == 'U':
+                        target = parse_tags(params[5])
+                        needs = parse_tags(params[6])
+                        
+                    elif u_type == 'V':
+                        target = parse_tags(params[6])
+                        needs = parse_tags(params[5])
+                        
+                    unit = {'type': u_type, 'action': action, 'energy': energy, 'tags': tags, 'target': target, 'life': life}
+                    
+                    if len(needs) > 0:
+                        unit['needs'] = needs 
+                    
+                    self.add_unit(unit)
+                    
+                    units_translated += 1
+                    
+                #if not enough energy is present return    
+                else:
+                    return units_translated
+            return units_translated
+        return False
+    
     def sample_probability(self, value):
         '''This function converts a probability (max action parameter) into 
         the actual number of actions performed.
@@ -582,7 +855,6 @@ class Cell(object):
             pr = self.pr_pos[i]
             if start <= pr[0] <= end and start <= pr[1] <= end:
                 self.pr_pos[i] = (pr[0] + length_diff, pr[1] + length_diff)
-        
         #update read positions
        
     def pos_protected(self, position):
@@ -935,141 +1207,7 @@ class Cell(object):
                         
                     return 1
         return 0
-        
-    def get_requested_reads(self):
-        '''Find all positions that are requested for translation this round.'''
-        requests, neg_requests = [], []
-        #find number of possible translations by adding up all actions from all translation units
-        tot_tr = 0
-        tr_list = [id for id in self.units.keys() if self.units[id]['type'] == 'N']
-        tf_list = [id for id in self.units.keys() if self.units[id]['type'] == 'F']
-        
-        for tr in tr_list:
-            tot_tr += self.sample_probability(self.units[tr]['action'])
-        
-        if tot_tr > 0:
-            #Translations
-            #Find all requestet translations
-            for unit in tf_list:
-                max_action = self.sample_probability(self.units[unit]['action'])
-                
-                #The target sequence without !
-                target = self.units[unit]['target'].replace('!', '')
-                
-                occurences = self.find_occurences('prom', 0, len(self.sequence), target, abs(max_action))
-                
-                for occ in occurences:
-                    if max_action > 0:
-                        requests.append(occ)
-                    else:
-                        neg_requests.append(occ)
-            
-            #Find constitutive promoters
-            pattern = 'P([0-9]+\.?[0-9]*)'
-            
-            regex = re.compile(pattern)
-            occurences = [(m.start(), m.groups()[0]) for m in regex.finditer(self.sequence)]
-            
-            for occ in occurences:
-                tr_start = occ[0] + len(occ[1]) + 1
-                #add found const prom to request list
-                max_tr = self.sample_probability(float(occ[1]))
-                for i in range(max_tr):
-                    requests.append(tr_start)
-                    
-            #remove negative regulated positions from the positive list if they are present
-            for req in neg_requests:
-                if req in requests:
-                    ind = requests.index(req)
-                    requests.pop(ind)
-                    
-            # pop starts that are protected
-            todel = []
-            for i in range(len(requests)):
-                if self.pos_protected(requests[i]):
-                    todel.append(requests[i])
-            
-            for tod in todel:
-                requests.pop(requests.index(tod))
-                   
-            random.shuffle(requests)
-            if len(requests) > tot_tr:
-                requests = requests[:tot_tr]
-                
-        return requests
-    
-    def add_subs(self, substances):
-        if type(substances) == tuple:
-            for substance in substances:
-                self.substances[self.subs_count] = substance
-                self.subs_count += 1
-        elif (type(substances) == str) or (type(substances) == unicode):
-            self.substances[self.subs_count] = substances
-            self.subs_count += 1
-            
-    def find_tags(self, tags, substances = True, units = False, remove = False, use_partner = False):
-        '''First checks if all the substances are present,
-        then removes the substances from the list. 
-        Returns True if successful and False if not.
-        also returns True when empty tuple is passed...'''
-        
-        subs_found = []
-        units_found = []
-        objects_to_return = []
-        
-        if use_partner:
-            mixed_subs = self.partner_substances.items()
-            mixed_units = self.partner_units.items()
-        else:
-            mixed_subs = self.substances.items()
-            mixed_units = self.units.items()
-            
-        random.shuffle(mixed_subs)
-        random.shuffle(mixed_units)
-        
-        for tag in tags:
-            found = False
-            tag = tag.replace('*', '[a-z_\*]')
-            tag = '^' + tag + '$'
-            reg = re.compile(tag)
-            
-            #Look for substances
-            if substances:
-                for ind in range(len(mixed_subs)):
-                    key, sub = mixed_subs[ind]
-                    res = reg.search(sub)
-                    if res:
-                        subs_found.append(key)
-                        objects_to_return.append((key, sub))
-                        del mixed_subs[ind]
-                        found = True
-                        break
-                     
-            #if substance is not found search for unit
-            if found == False and units == True:
-                for ind in range(len(mixed_units)):
-                    key, unit = mixed_units[ind]
-                    for sub_tag in unit['tags']:
-                        res = reg.search(sub_tag)
-                        if res:
-                            units_found.append(key)
-                            objects_to_return.append((key, unit))
-                            del mixed_units[ind]
-                            found = True
-                            break
-                    if found:
-                        break
-                
-        if len(tags) == len(units_found) + len(subs_found):
-            if remove and not use_partner:
-                for sub in subs_found:
-                    del self.substances[sub]
-                for unit in units_found:
-                    del self.units[unit]   
-            return tuple(objects_to_return)
-        else:
-            return False
-    
+         
     def convert_subs(self, unit):
         #try to find and delete the starting substances
         #if successful add resulting sequences
@@ -1286,185 +1424,7 @@ class Cell(object):
                     return 1
                 
         return 0
-    
-    def find_occurences(self, template, start, stop, target, maxi):
-        '''finds sequence (only sequence data no enzyme target sites)
-        finds maximal number of occurences, fills up to maximum'''
-        
-        target = target.replace('X', '[GATCX]')
-        
-        if target[len(target)-1] == ';':
-            target += '([^0-9]|$)'
-        
-        target_seq = lambda x: self.pos_target(x, 'own')
-        seq = self.sequence
-        
-        if template == 'prom':
-            target = '(P[0-9]*\.?[0-9]*)' + target
-        
-        elif template == 'ext':
-            seq = self.partner_sequence
-            target_seq = lambda x: self.pos_target(x, 'ext')
-        
-        results = re.compile(target).finditer(seq[start:stop])
-        
-        occ = []
-        for res in results:
-            pos = res.start() + start
-            if template == 'prom':
-                pos += len(res.groups()[0])
-                
-            if not target_seq(pos):
-                occ.append(pos)
-        
-        #Limit/extend the number of result until max_action is reached  
-        choices = []
-        if len(occ)>0:
-            random.shuffle(occ)
-            if maxi < len(occ):
-                choices = occ[:maxi]
-            else:
-                #Add random elements until max is reached
-                choices = occ
-                missing = maxi - len(choices)
-                while missing > 0:
-                    if len(occ) < missing:
-                        choices += occ
-                    else:
-                        choices += occ[:missing]
-                    missing = maxi - len(choices)
-            
-        return choices
-    
-    def read_seq(self, start = 0, energy_per_unit = 0, adress = False):
-        '''Parse a sequence into unit(s) and add to pool'''
-        
-        if adress != (self.id,) and adress != False:
-            adress = list(adress)
-            adress.pop(0)
-            try:
-                self.cells[adress[0]].read_seq(start = start, energy_per_unit = energy_per_unit, adress = tuple(adress))
-                return True
-            except KeyError:
-                #cell isn't here anymore
-                return False
-        else:
-            try:
-                l = len(self.sequence)
-                if l == 0:
-                    return False
-            except IndexError:
-                return False
-            
-            try:   
-                while self.sequence[start] == ';' and start != len(self.sequence) -1:
-                    start += 1
-            except IndexError:
-                return False
-            
-            #Find stop sign 'S' or end of sequence ';'
-            sequence = self.sequence[start:]
-            
-            try:
-                stop = sequence.index('S') + start
-                seq_end = sequence.index(';') + start
-                if seq_end < stop:
-                    stop = seq_end
-            except ValueError:
-                try:
-                    stop = sequence.index(';') + start
-                except ValueError:
-                    stop = len(self.sequence)
-                    
-            # Check if any position between start and stop is protected,
-            #if so this moves the stop up to that position
-            
-            for test in range(start, stop):
-                if self.pos_protected(test):
-                    stop = test
-                    break
-                    
-            sequence = self.sequence[start:stop]
-            #Create regular expression pattern
-            #matching for unit description
-            pattern = r'([NRLFMEIOQDZUVY])'               #unit type [0]
-            pattern += r'([\-]*\d+[\.]?\d*)'            #max action parameter (can be floating point) [1]
-            pattern += r'/?(\d*[\.]?\d*)'               #optional energy parameter after / (can be floating point) [2]
-            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags in () [3]
-            pattern += r'\[[GTACXP0-9]*\]'              #contained sequence in [] 
-            pattern += r'([GTACX\!]*)'                  #optional target sequence [4]
-            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags targets [5] (or starting substances for conversion unit V)
-                                                        #this also serves as conditional substances for all except V or U
-            pattern += r'\(?([a-z_,\*]*)\)?'              #optional tags resulting substances (V) [6]
-                                                        #or conditional substances for U
-            pattern += r'([0-9]+)'                      #life parameter [7]
-        
-            regex = re.compile(pattern)
-            new_units = regex.finditer(sequence)
-            
-            #little helper function to parse the target content into a 
-            #tuple of strings
-            def parse_tags(tag):
-                pattern = r'([a-z_\*]+)'
-                found_tags = re.compile(pattern).finditer(tag)
-                all_tags = []
-                for t in found_tags:
-                    all_tags.append(t.groups()[0])
-                    
-                return tuple(all_tags)
-            
-            units_translated = 0
-            #Add new units to pool and respective lists
-            for unit in new_units:
-                #Check if enough energy is present to translate next unit
-                if self.has_energy(total = True) - (energy_per_unit * (units_translated+1)) >= 0:
-                    params = unit.groups()
-                    
-                    action = float(params[1])
-                    life = int(params[7])
-                    tags = parse_tags(params[3])
-                    target = params[4]
-                    u_type = params[0]
-                    needs = parse_tags(params[5])
-                    
-                    #negative parameters only allowed for transport (U) and Transcription Factor (F)
-                    if u_type not in ('F', 'U'):
-                        action = abs(action)
-                    
-                    if len(params[2]) == 0:
-                        energy = 0
-                    else:
-                        energy = float(params[2])
-                    
-                    if u_type in ('I', 'Q', 'D'):
-                        try:
-                            target = target.replace('!', '')
-                        except:
-                            pass
-                    
-                    elif u_type == 'U':
-                        target = parse_tags(params[5])
-                        needs = parse_tags(params[6])
-                        
-                    elif u_type == 'V':
-                        target = parse_tags(params[6])
-                        needs = parse_tags(params[5])
-                        
-                    unit = {'type': u_type, 'action': action, 'energy': energy, 'tags': tags, 'target': target, 'life': life}
-                    
-                    if len(needs) > 0:
-                        unit['needs'] = needs 
-                    
-                    self.add_unit(unit)
-                    
-                    units_translated += 1
-                    
-                #if not enough energy is present return    
-                else:
-                    return units_translated
-            return units_translated
-        return False
-            
+              
     def parse_status(self):
         '''Parse units into string'''
         
@@ -1537,3 +1497,42 @@ class Cell(object):
         resp_str += '\n-------------------------------------------------------------\n'
         
         return resp_str
+    
+    def write_log(self, cont = False):
+        #write log in cell and all sub cells
+        #cast lists of unit and substance values (otherwise it will be dynamic
+        #and the values would always reflect the same round...
+        
+        units = list(self.units.values())
+        substances = list(self.substances.values())
+        self.log[self.rounds] = {'units': units, 'energy': self.has_energy(total = True), 'sequence': self.sequence, 'substances': substances}
+        
+        if cont:
+            for cell in self.cells.keys():
+                self.cells[cell].write_log(cont = True)
+                
+    def save_cell_log_csv(self, filename, adress = False):
+        '''Adress has to contain the current cell id as first parameter'''
+        
+        if adress != False:
+            #redirect call to subcell 
+            cell = self.get_subcell_by_adress(adress)
+            cell.save_cell_log_csv(filename, adress = False)
+        else:
+            f = open(filename, 'wt')
+            try:
+                writer = csv.writer(f, delimiter = '\t')
+                #set titles of columns
+                writer.writerow( ('Round', 'Length Sequence', 'Energy', '#Substances','#F', '#N','#R','#L','#M','#E','#I','#O','#Q','#D','#Z','#U','#V','#Y','Sequence'))
+                
+                for rnd, entry in self.log.items():
+                    #Count number of ocurences of each unit type
+                    u = Counter([unit['type'] for unit in entry['units']])
+                    
+                    #write data in column
+                    writer.writerow((str(rnd), len(entry['sequence']), entry['energy'], len(entry['substances']), 
+                                         u['F'], u['N'], u['R'], u['L'], u['M'], u['E'], 
+                                         u['I'], u['O'], u['Q'], u['D'], u['Z'], u['U'], u['V'], u['Y'], entry['sequence']))
+                    
+            finally:
+                f.close()
