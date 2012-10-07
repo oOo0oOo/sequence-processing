@@ -673,7 +673,6 @@ class TestSequenceCopyTransportUnit(unittest.TestCase):
             self.assertEqual(c.cells[ind].sequence, exp)
     
 class TestSquenceExportImport(unittest.TestCase):
-    
     def test_roundtrips(self):
         test_cases = [
                       (';E1[]G!A1I-1[]AA2SGGGAAAA;', ';E1[]G!A1I-1[]AA2SGGGAAAA;;AAAA;'),
@@ -790,9 +789,9 @@ class TestFindOccurence(unittest.TestCase):
     
     def test_find_occ_bad(self):
         test_cases = [(';E1[]CC!1I1[]AA3GGCCTTAATT;', 'CC', [18]),
-                      (';E1.0[]!GG1I1[]AA3GGCCTTAATT;', 'GG', [18]),
-                      (';E1[]!GG1I1[]AA3GGCCTTAATT;', 'AA', [22]),
-                      (';E1.0[]!GG1I1[]AA3GGAACCAATTAATT;', 'AA', [20, 24, 28]),
+                      (';R1.0[]!GG1I1[]AA3GGCCTTAATT;', 'GG', [18]),
+                      (';O1[]!GG1I1[]AA3GGCCTTAATT;', 'AA', [22]),
+                      (';L1.0[]!GG1I1[]AA3GGAACCAATTAATT;', 'AA', [20, 24, 28]),
                       (';Q3.0[]AGCC3AGCCAGCCAGCC;', 'AGCC', [12, 16, 20])
                       ]
         

@@ -500,7 +500,7 @@ class Cell(object):
                     elif a_type == 'L':
                         num_act = self.ligate_seq(param)
                     elif a_type == 'E':
-                        num_act = self.export_seq(param)
+                        num_act = self.copy_transport_seq(param)
                     elif a_type == 'I':
                         num_act = self.transport_seq(param)
                     elif a_type == 'M':
@@ -1260,7 +1260,7 @@ class Cell(object):
                     return 1
         return 0
     
-    def export_seq(self, unit):
+    def copy_transport_seq(self, unit):
         '''Does all the actions of one export enzyme. Copy sequence and label for export.
         Caution: The export unit creates only double-stranded sequences even from 
         a overhanging template (overhang will be copied).
