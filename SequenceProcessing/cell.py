@@ -502,7 +502,7 @@ class Cell(object):
                     elif a_type == 'E':
                         num_act = self.export_seq(param)
                     elif a_type == 'I':
-                        num_act = self.import_seq(param)
+                        num_act = self.transport_seq(param)
                     elif a_type == 'M':
                         num_act = self.mutate_seq(param)
                     elif a_type == 'O':
@@ -691,7 +691,7 @@ class Cell(object):
                     needs = parse_tags(params[5])
                     
                     #negative parameters only allowed for transport (U) and Transcription Factor (F)
-                    if u_type not in ('F', 'U'):
+                    if u_type not in ('F', 'U', 'I', 'E'):
                         action = abs(action)
                     
                     if len(params[2]) == 0:
@@ -1324,40 +1324,62 @@ class Cell(object):
                         black_list.append(start)
         return 0 
             
-    def import_seq(self, unit):
-        '''Does all the actions of one import unit.'''
+    def transport_seq(self, unit):
+        '''Makes exactly one transport'''
         #The target sequence without !
         target = self.units[unit]['target'].replace('!', '')
         count = 0
+        if self.units[unit]['action'] < 0:
+            sequence = self.partner_sequence
+            mode = 'ext'
+            length = len(self.partner_sequence)
+            
+        elif self.units[unit]['action'] > 0:
+            sequence = self.sequence
+            mode = 'own'
+            length = len(self.sequence)
         
+        else:
+            return 0
+            
         while count < 25:
             count += 1
-            occ = self.find_occurences('ext', 0, len(self.partner_sequence), target, 1)
+            occ = self.find_occurences(mode, 0, length, target, 1)
             if len(occ) > 0:
                 occ = occ[0]
                 #search the next forward end
                 target_forward = '(;[0-9]*)'
                 #revert backward sequence to check for next match
-                back_rev = self.partner_sequence[:occ]
+                back_rev = sequence[:occ]
                 back_rev = back_rev[::-1]
                 #search results in forward direction
-                res_forw = re.compile(target_forward).search(self.partner_sequence[occ:], 1)
+                res_forw = re.compile(target_forward).search(sequence[occ:], 1)
                 #search results in backward direction with inverted positions
                 start_pos = occ - back_rev.index(';') - 1
                 if not res_forw:
                     return 0
                 
                 end_pos = occ + res_forw.start() + len(res_forw.groups()[0])
-                new_sequence = self.partner_sequence[start_pos : end_pos]
-                #add new sequence
-                self.sequence += new_sequence
-                seq = self.partner_sequence[:start_pos] + self.partner_sequence[end_pos:]
-                if seq:
-                    if seq[len(seq)-1] != ';':
+                new_sequence = sequence[start_pos : end_pos]
+                old_seq = sequence[:start_pos] + sequence[end_pos:]
+                if old_seq:
+                    if old_seq[len(old_seq)-1] != ';':
                         end_pos += 1
-                #remove from top cell
-                self.transported['seq_import'] = (start_pos, end_pos,)
-                return 1
+                
+                if mode == 'ext':
+                    #add new sequence to own sequence
+                    self.sequence += new_sequence
+                            
+                    #remove from top cell
+                    self.transported['seq_import'] = (start_pos, end_pos,)
+                    return 1
+                
+                elif mode == 'own':
+                    #remove sequence from own sequence
+                    self.sequence = old_seq
+                
+                    #export in partner cell
+                    self.transported['seq_export'] = new_sequence
         return 0
                 
     def delete_seq(self, unit):

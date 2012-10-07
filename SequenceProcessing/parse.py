@@ -237,8 +237,8 @@ class Parser:
         if result != None:
             raise SequenceError(self.sequence, result.start(), 'Parameter not allowed at this position.')
         
-        #Negative parameters are only allowed for tf max action parameter
-        patterns = ['[^FU\!](\-)', '(\-)[^0-9]', '[^FU]\!(\-)']
+        #Negative parameters are only allowed for F,U,I or E action parameter
+        patterns = ['[^FUIE\!](\-)', '(\-)[^0-9]', '[^FUIE]\!(\-)']
         for pattern in patterns:
             res0 = re.compile(pattern).search(self.sequence, 1)
             if res0 != None:

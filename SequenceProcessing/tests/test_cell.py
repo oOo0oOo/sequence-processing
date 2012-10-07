@@ -60,12 +60,13 @@ class TestSubCell(unittest.TestCase):
         '''test 4th layers of sub cell'''
         
         test_cases = [(';R10[]A!C1AAAACCCCCCC;', ';R10[]A!C1AAAA;;CCCCCCC;'),
-                      (';E1[]G!A1I1[]AA2SGGGAAAA;', ';E1[]G!A1I1[]AA2SGGGAAAA;;AAAA;'),
-                      (';E1[]G!A1I1[]TT2SGGGACCCCCCTT;', ';E1[]G!A1I1[]TT2SGGGACCCCCCTT;;ACCCCCCTT;'),
-                      (';E1[]CC!1I1[]AA3GGCCTTAATT;', ';E1[]CC!1I1[]AA3GGCCTTAATT;;TTAATT;'),
-                      (';E1[]G!A1I1[]CC1SGGGAAAA;',';E1[]G!A1I1[]CC1SGGGAAAA;'), #test bad roundtrips (expecting no change in sequence)
-                      (';E1[]G!A1I1[]XG1SGGGAAAA;',';E1[]G!A1I1[]XG1SGGGAAAA;'),
-                      (';E1[]C!A1I1[]AA1SGGGAAAA;',';E1[]C!A1I1[]AA1SGGGAAAA;')]
+                      (';E1[]G!A1I-1[]AA2SGGGAAAA;', ';E1[]G!A1I-1[]AA2SGGGAAAA;;AAAA;'),
+                      (';E1[]G!A1I-1[]TT2SGGGACCCCCCTT;', ';E1[]G!A1I-1[]TT2SGGGACCCCCCTT;;ACCCCCCTT;'),
+                      (';E1[]CC!1I-1[]AA3GGCCTTAATT;', ';E1[]CC!1I-1[]AA3GGCCTTAATT;;TTAATT;'),
+                      (';E1[]G!A1I-1[]CC1SGGGAAAA;',';E1[]G!A1I-1[]CC1SGGGAAAA;'), #test bad roundtrips (expecting no change in sequence)
+                      (';E1[]G!A1I-1[]XG1SGGGAAAA;',';E1[]G!A1I-1[]XG1SGGGAAAA;'),
+                      (';E1[]C!A1I-1[]AA1SGGGAAAA;',';E1[]C!A1I-1[]AA1SGGGAAAA;')
+                      ]
         
         for test in test_cases:
             
@@ -97,7 +98,7 @@ class TestSubCell(unittest.TestCase):
         '''This test takes more than 95% of time...
             Its fine as long as it does not trigger an error.'''
         
-        tests = [';AAAAI3[]AA3E3[]A!A3I5[]AA3Q3[]CC3;',
+        tests = [';AAAAI-3[]AA3E3[]A!A3I-5[]AA3Q3[]CC3;',
                  ';R10(re)[]A!C10U10[](re)10AAAACCCCCCC;', 
                  ';V3[]()(crazy_stuff)3;', ';N3[]4F-5.0[]!AAA4SP6AAAN1.0[]2S;',
                  ';Y1[]1R10[]A!A10L10[]A!A10Q10[]AA10P50SF-100[]20;', '', ';;']
@@ -184,6 +185,14 @@ class TestUnitCreation(unittest.TestCase):
                                                        'target': '', 'life': 1, 'tags': tuple()}]),
                       (';Y3.5/3(cell_splitter)[]1;', [{'type': 'Y', 'action': 3.5, 'energy': 3, 
                                                        'target': '', 'life': 1, 'tags': ('cell_splitter',)}]),
+                      
+                      #Sequence transport
+                      (';I-2/3[]AAX1;',                [{'type': 'I', 'action': -2, 'energy': 3, 
+                                                       'target': 'AAX', 'life': 1, 'tags': tuple()}]),
+                      
+                      #sequence copy transport
+                      (';E-1.2/3[]A!AX1;',                [{'type': 'E', 'action': -1.2, 'energy': 3, 
+                                                       'target': 'A!AX', 'life': 1, 'tags': tuple()}]),
                       
                       #Multiple Units
                       (';N10[]3F1[]A!A(stuff)2F-3[]A!A2SM0[]2;', [{'type': 'N','action': 10,'energy': 0,
@@ -590,6 +599,45 @@ class TestTranscriptionFactor(unittest.TestCase):
             c.read_seq()
             c.run_all()
             self.assertEqual(len(c.units), num_units)
+            
+class TestSequenceTransport(unittest.TestCase):
+    def test_sequence_import(self):
+        tests = [(';I-1.0[]GAT1;', ';GATTACA;', ';I-1.0[]GAT1;;GATTACA;', ''), #test import good
+                      (';I-1[]GAT1XXAA;2', ';GATTACA;', ';I-1[]GAT1XXAA;2;GATTACA;' , ''),
+                      (';I-1[]CC1XXAA;', ';TTTTCC;', ';I-1[]CC1XXAA;;TTTTCC;' , ''),
+                      (';I-1[]CC1XXAA;', ';GGGTAC;;TTTTCC;', ';I-1[]CC1XXAA;;TTTTCC;' , ';GGGTAC;'),
+                      (';I-1[]CC1XXAA;', ';GGGTAC;;TTTTCC;', ';I-1[]CC1XXAA;;TTTTCC;', ';GGGTAC;'),
+                      (';I-1[]CC1XXAA;', ';GGGTAC;;TTTTCC;;GGGTAC;', ';I-1[]CC1XXAA;;TTTTCC;', ';GGGTAC;;GGGTAC;'),
+                      (';I-1[]CC1XXAA;', ';GGGTAC;;TTTTCC;;TTXTAC;', ';I-1[]CC1XXAA;;TTTTCC;', ';GGGTAC;;TTXTAC;'),
+                      (';I-1.0[]C!C1XXAA;', ';TTTTCC;', ';I-1.0[]C!C1XXAA;;TTTTCC;', ''),         # Ignore the ! 
+                      (';I-1[]!TT1XXAA;', ';TTTTCC;', ';I-1[]!TT1XXAA;;TTTTCC;', ''),
+                      (';I-1[]TC!1XXAA;', ';TTTTCC;', ';I-1[]TC!1XXAA;;TTTTCC;', ''),
+                      (';I-1[]XCC1;', ';GATTACA;', ';I-1[]XCC1;', ';GATTACA;'),                   #test bad imports
+                      (';I-1[]XG1XXAA;2', ';GATTACA;', ';I-1[]XG1XXAA;2', ';GATTACA;'),
+                      (';I-1[]G1XXAA;', ';TTTTCC;', ';I-1[]G1XXAA;', ';TTTTCC;')
+                      ]
+        
+        for seq, ext, exp, exp_ext in tests:
+            c = cell.Cell(ext)
+            ind = c.new_sub_cell(seq)
+            c.cells[ind].read_seq()
+            c.run_all()
+            self.assertEqual(c.cells[ind].sequence, exp)
+            self.assertEqual(c.sequence, exp_ext)
+            
+    def test_sequence_export(self):
+        tests = [(';I1[]AA1;;AAAA;', ';I1[]AA1;', ';AAAA;'),
+                 (';I1[]XX1;;AAAA;', ';I1[]XX1;', ';AAAA;'),
+                 (';I3[]AA1;;AA;;AA;;AA;', ';I3[]AA1;', ';AA;;AA;;AA;'),
+                 ]
+        
+        for seq, exp, exp_ext in tests:
+            c = cell.Cell()
+            ind = c.new_sub_cell(seq)
+            c.cells[ind].read_seq()
+            c.run_all()
+            self.assertEqual(c.cells[ind].sequence, exp)
+            self.assertEqual(c.sequence, exp_ext)
  
 class TestExportUnit(unittest.TestCase):
     '''Implements test methods for the sequence export unit'''
@@ -612,12 +660,12 @@ class TestSquenceExportImport(unittest.TestCase):
     
     def test_roundtrips(self):
         test_cases = [
-                      (';E1[]G!A1I1[]AA2SGGGAAAA;', ';E1[]G!A1I1[]AA2SGGGAAAA;;AAAA;'),
-                      (';E1[]G!A1I1[]TT2SGGGACCCCCCTT;', ';E1[]G!A1I1[]TT2SGGGACCCCCCTT;;ACCCCCCTT;'),
-                      (';E1[]CC!1I1[]AA3GGCCTTAATT;', ';E1[]CC!1I1[]AA3GGCCTTAATT;;TTAATT;'),
-                      (';E1[]G!A1I1[]CC1SGGGAAAA;',';E1[]G!A1I1[]CC1SGGGAAAA;'), #test bad roundtrips (expecting no change in sequence)
-                      (';E1[]G!A1I1[]XG1SGGGAAAA;',';E1[]G!A1I1[]XG1SGGGAAAA;'),
-                      (';E1[]C!A1I1[]AA1SGGGAAAA;',';E1[]C!A1I1[]AA1SGGGAAAA;')
+                      (';E1[]G!A1I-1[]AA2SGGGAAAA;', ';E1[]G!A1I-1[]AA2SGGGAAAA;;AAAA;'),
+                      (';E1[]G!A1I-1[]TT2SGGGACCCCCCTT;', ';E1[]G!A1I-1[]TT2SGGGACCCCCCTT;;ACCCCCCTT;'),
+                      (';E1[]CC!1I-1[]AA3GGCCTTAATT;', ';E1[]CC!1I-1[]AA3GGCCTTAATT;;TTAATT;'),
+                      (';E1[]G!A1I-1[]CC1SGGGAAAA;',';E1[]G!A1I-1[]CC1SGGGAAAA;'), #test bad roundtrips (expecting no change in sequence)
+                      (';E1[]G!A1I-1[]XG1SGGGAAAA;',';E1[]G!A1I-1[]XG1SGGGAAAA;'),
+                      (';E1[]C!A1I-1[]AA1SGGGAAAA;',';E1[]C!A1I-1[]AA1SGGGAAAA;')
                       ]
         for seq, exp in test_cases:
             c = cell.Cell()
@@ -709,33 +757,6 @@ class TestProtectionUnit(unittest.TestCase):
             for i in range(num_rounds):
                 c.run_all()
             self.assertEqual(c.sequence, seq)
-            
-class TestSequenceImportUnit(unittest.TestCase):
-    '''Implements test methods for the sequence import unit'''
-    
-    def test_import(self):
-        #Format: initial sequence, initial external sequence, expected sequence, expected external sequence
-        test_cases = [(';I1.0[]GAT1;', ';GATTACA;', ';I1.0[]GAT1;;GATTACA;', ''), #test import good
-                      (';I1[]GAT1XXAA;2', ';GATTACA;', ';I1[]GAT1XXAA;2;GATTACA;' , ''),
-                      (';I1[]CC1XXAA;', ';TTTTCC;', ';I1[]CC1XXAA;;TTTTCC;' , ''),
-                      (';I1[]CC1XXAA;', ';GGGTAC;;TTTTCC;', ';I1[]CC1XXAA;;TTTTCC;' , ';GGGTAC;'),
-                      (';I1[]CC1XXAA;', ';GGGTAC;;TTTTCC;', ';I1[]CC1XXAA;;TTTTCC;', ';GGGTAC;'),
-                      (';I1[]CC1XXAA;', ';GGGTAC;;TTTTCC;;GGGTAC;', ';I1[]CC1XXAA;;TTTTCC;', ';GGGTAC;;GGGTAC;'),
-                      (';I1[]CC1XXAA;', ';GGGTAC;;TTTTCC;;TTXTAC;', ';I1[]CC1XXAA;;TTTTCC;', ';GGGTAC;;TTXTAC;'),
-                      (';I1.0[]C!C1XXAA;', ';TTTTCC;', ';I1.0[]C!C1XXAA;;TTTTCC;', ''),         # Ignore the ! 
-                      (';I1[]!TT1XXAA;', ';TTTTCC;', ';I1[]!TT1XXAA;;TTTTCC;', ''),
-                      (';I1[]TC!1XXAA;', ';TTTTCC;', ';I1[]TC!1XXAA;;TTTTCC;', ''),
-                      (';I1[]XCC1;', ';GATTACA;', ';I1[]XCC1;', ';GATTACA;'),                   #test bad imports
-                      (';I1[]XG1XXAA;2', ';GATTACA;', ';I1[]XG1XXAA;2', ';GATTACA;'),
-                      (';I1[]G1XXAA;', ';TTTTCC;', ';I1[]G1XXAA;', ';TTTTCC;'),
-                      ]
-        for start1, start2, end1, end2  in test_cases:
-            c = cell.Cell(start2)
-            ind = c.new_sub_cell(start1)
-            c.cells[ind].read_seq()
-            c.run_all()
-            self.assertEqual(c.cells[ind].sequence, end1)
-            self.assertEqual(c.sequence, end2)
     
 class TestFindOccurence(unittest.TestCase):
     def test_occurence(self):

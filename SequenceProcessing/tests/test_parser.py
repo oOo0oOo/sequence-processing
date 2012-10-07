@@ -25,8 +25,8 @@ class TestSequenceWarnings(unittest.TestCase):
         sequences = [';I3(a)[]G!C10;', ';I3(a)[]10;', ';D3(a)[]4;', ';Q3(a)[]G!C10;', ';Q3(a)[]10;', #only target without !
                      ';M1(a)[]CCCT2;',';M1(a)[]X!X2;', ';N3(a)[]XCXC54;',';N3(a)[]XC!XC54;', #no target
                      ';Z1(a)[]CCCT2;',';Z1(a)[]X!X2;', ';Y1(a)[]CCCT2;',';Y1(a)[]X!X2;',
-                     ';F3(a)[]4;', ';R3(a)[]4;', ';L3(a)[]4;', ';E3(a)[]4;', ';U3(a)[]4;' #normal target
-                     ';F3(a)[]XX4;', ';R3(a)[]XX4;', ';L3(a)[]XX4;', ';E3(a)[]XX4;']
+                     ';F3(a)[]4;', ';R3(a)[]4;', ';L3(a)[]4;', ';U3(a)[]4;', ';E3(a)[]4;' #normal target
+                     ';F3(a)[]XX4;', ';R3(a)[]XX4;', ';L3(a)[]XX4;', ';E-3(a)[]TTC4;']
         
         res = self.check_sequences(sequences)         
         self.assertEqual(res, len(sequences), 'Sequence failed to trigger SequenceWarning.')
@@ -94,6 +94,10 @@ class TestParserCheckSequence(unittest.TestCase):
                      ';V1[](glucose,glucose*)(mannose)3;',
                      ';Z1[](energy,*,**)2;',
                      ';Y1/5[]1;', ';V1[]()()1;', ';V1[]()1;'
+                     ';I-5[]AAA10;', ';I-3[]TTC10;',
+                     ';I5/3.5[]ACCT1;',
+                     ';E-5[]AA!A10;', ';E-3[]T!TC10;',
+                     ';E5/3.5[]A!CCT1;'
                      ]
         
         test = self.check_sequences(sequences)         
@@ -159,7 +163,8 @@ class TestParserCheckSequence(unittest.TestCase):
         
     def test_parameter_syntax(self):
         sequences = [';AAPTS2G;', ';M10[3AA]1;', ';ATGP1234AC;', ';R-10.12[]AT!3;', ';M-3[]AT!3;', ';M3[]-3;',
-                     ';F-1[]A!-2;', ';D-1.3[]A!G2;', ';D1[]A!G-22;']
+                     #';F-1[]A!-2;', 
+                     ';D-1.3[]A!G2;', ';D1[]A!G-22;']
         test = self.check_sequences(sequences)
         self.assertEqual(test, len(sequences), 'Illegal parameter failed to trigger SequenceError...')
 
