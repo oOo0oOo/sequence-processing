@@ -1269,25 +1269,41 @@ class Cell(object):
         #The target sequence without !
         target = self.units[unit]['target']
         
+        if self.units[unit]['action'] > 0:
+            sequence = self.sequence
+            mode = 'own'
+            length = len(self.sequence)
+            
+        elif self.units[unit]['action'] < 0:
+            sequence = self.partner_sequence
+            mode = 'ext'
+            length = len(self.partner_sequence)
+        
         pos = target.index('!')
         target = target.replace('!', '')
         i = 0
         while i < 15:
             i += 1
-            occ = self.find_occurences('own', 0, len(self.sequence), target, 1)
+            occ = self.find_occurences(mode, 0, length, target, 1)
             if len(occ) > 0:
                 occ = occ[0]
                 occ += pos
-                if not self.pos_protected(occ):
-                    #search the next end
-                    pattern = '(;[0-9]*)'
-                    seq = self.sequence[occ:]
-                    result = re.compile(pattern).search(seq, 1)
+                if mode == 'own':
+                    if self.pos_protected(occ):
+                        return 0
+                
+                #search the next end
+                pattern = '(;[0-9]*)'
+                seq = sequence[occ:]
+                result = re.compile(pattern).search(seq, 1)
                     
-                    if result:            
-                        end_pos = result.start() + len(result.groups(0))
-                        
+                if result:
+                    end_pos = result.start() + len(result.groups(0))
+                    if mode == 'own':            
                         self.transported['seq_export'] = ';' + seq[:end_pos]
+                        return 1
+                    if mode == 'ext':
+                        self.sequence += ';' + seq[:end_pos]
                         return 1
         return 0
     

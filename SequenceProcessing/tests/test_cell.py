@@ -639,10 +639,10 @@ class TestSequenceTransport(unittest.TestCase):
             self.assertEqual(c.cells[ind].sequence, exp)
             self.assertEqual(c.sequence, exp_ext)
  
-class TestExportUnit(unittest.TestCase):
-    '''Implements test methods for the sequence export unit'''
+class TestSequenceCopyTransportUnit(unittest.TestCase):
+    '''Implements test methods for the sequence copy transport unit'''
     
-    def test_export(self):
+    def test_sequence_copy_export(self):
         test_cases = [(';E1[]G!AT1SXXXPGATXXXM1[]1;XXTC;',';ATXXXM1[]1;'),        
                       (';E1[]CC!1GGCCTTAATT;',';TTAATT;'),
                       (';E5[]GX!AT1SXXXPGGATPGATN1[]1;',
@@ -655,7 +655,23 @@ class TestExportUnit(unittest.TestCase):
             c.cells[ind].read_seq()
             c.run_all()
             self.assertEqual(c.sequence, exp, 'Result, Expected \n{0}\n{1}'.format(c.sequence, exp))
-
+            self.assertEqual(c.cells[ind].sequence, seq)
+            
+    def test_sequence_copy_import(self):       
+        tests = [
+                 (';E-1[]A!A1;', ';CCAAXX;', ';E-1[]A!A1;;AXX;'),
+                 (';E-2[]A!A1;', ';CCAAXX;', ';E-2[]A!A1;;AXX;;AXX;'),
+                 (';E-3[]A!X1;', ';CCACXX;', ';E-3[]A!X1;;CXX;;CXX;;CXX;')
+                 ]
+        
+        for seq, ext, exp in tests:
+            c = cell.Cell(ext)
+            ind = c.new_sub_cell(seq)
+            c.cells[ind].read_seq()
+            c.run_all()
+            self.assertEqual(c.sequence, ext)
+            self.assertEqual(c.cells[ind].sequence, exp)
+    
 class TestSquenceExportImport(unittest.TestCase):
     
     def test_roundtrips(self):
