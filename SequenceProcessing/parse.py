@@ -439,7 +439,6 @@ class Parser:
             else:
                 found_unit = False
             
-            
             found_target = False 
             
             if len(target_pos) > 0:

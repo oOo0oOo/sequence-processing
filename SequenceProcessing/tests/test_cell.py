@@ -245,7 +245,11 @@ class TestUnitCreation(unittest.TestCase):
                       (';V1[](a_b_c)()3;', [{'type': 'V','action': 1,'energy': 0,'target': tuple(), 'needs': ('a_b_c', ),
                                              'life': 3,'tags': tuple()}]),
                       (';V1/1.5[](a_b_c)5;', [{'type': 'V','action': 1, 'energy': 1.5, 'target': tuple(), 'needs': ('a_b_c', ), 
-                                               'life': 5,'tags': tuple()}])
+                                               'life': 5,'tags': tuple()}]),
+                      (';V2[]()(*,**,***,****,*****,******,*******)1;', 
+                       [{'type': 'V','action': 2, 'energy': 0, 'target': ('*', '**', '***', '****', '*****', '******', '*******'),
+                         'life': 1,'tags': tuple()}])
+                      
                       ]
         
         for test_case in test_cases:
@@ -399,6 +403,8 @@ class TestSubstances(unittest.TestCase):
                       (';V2[](a)(c,d)1;', ('a', 'a'), ['c', 'd', 'c', 'd']),
                       (';V2/1[](a)(c,d)1;', ('a', 'a'), ['a', 'a']),
                       (';V1[]()(c,d)1;', (), ['c', 'd']), #Substance creation
+                      (';V1[]()(*,**,***,****,*****,******,*******)1;',
+                       (), ['*','**','***','****', '*****','******','*******']),
                       (';V1[]()(*,***)1;', (), ['*', '***']), 
                       (';V2[](a,a)()1;', ('a', 'a', 'a', 'a'), []), #Substance destruction
                       (';V3[](a,a)()1;', ('a', 'a', 'a'), ['a']),

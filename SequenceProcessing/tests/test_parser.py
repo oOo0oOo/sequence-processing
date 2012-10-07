@@ -94,10 +94,9 @@ class TestParserCheckSequence(unittest.TestCase):
                      ';V1[](glucose,glucose*)(mannose)3;',
                      ';Z1[](energy,*,**)2;',
                      ';Y1/5[]1;', ';V1[]()()1;', ';V1[]()1;'
-                     ';I-5[]AAA10;', ';I-3[]TTC10;',
-                     ';I5/3.5[]ACCT1;',
-                     ';E-5[]AA!A10;', ';E-3[]T!TC10;',
-                     ';E5/3.5[]A!CCT1;'
+                     ';I-5[]AAA10;', ';I-3[]TTC10;', ';I5/3.5[]ACCT1;',
+                     ';E-5[]AA!A10;', ';E-3[]T!TC10;', ';E5/3.5[]A!CCT1;', 
+                     ';I-3(a)[]GC10;'
                      ]
         
         test = self.check_sequences(sequences)         
