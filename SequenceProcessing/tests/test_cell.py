@@ -423,24 +423,21 @@ class TestSubstances(unittest.TestCase):
             self.assertEqual(sub, exp)
                 
 
-class TestChangeSequenceLength(unittest.TestCase):
-    def test_protection_change(self):
-        test_cases = [(';Q1[]AA1TTAACC;', (8, 3), [(13,14)]),
-                      (';Q1[]AA1TTAACC;', (8, 10), [(20,21)]),
-                      (';Q1[]AA1TTAACC;', (9, -3), [(7,8)]),
-                      (';Q1[]AA1TTAACC;', (12, 10), [(10,11)]),
-                      (';Q1[]AA1TTAACC;', (13, -50), [(10,11)])]
+class TestRemapPositions(unittest.TestCase):
+    def test_remap_protection(self):
+        test_cases = [(';Q1[]AA2TTAACC;', [(0, 8), (10, 15)], [(8,9)]),
+                      (';Q1[]AA2TTCCAACC;', [(0, 8), (12, 17), (8, 12)], [(8,9)]),
+                      (';Q1[]AA2TTAACC;', [(0, 8), (-1, 3),(10, 15)], [(11,12)]),
+                      ]
         
-        for test in test_cases:
-            c = cell.Cell(test[0])
-            c.read_seq(0)
+        for seq, remap, exp in test_cases:
+            c = cell.Cell(seq)
+            c.read_seq()
             c.run_all()
-            c.change_sequence_length(test[1][0], test[1][1])
-            self.assertEqual(c.pr_pos, test[2])
+            c.remap_positions(remap)
+            self.assertEqual(c.pr_pos, exp)
             
     def test_protection_change_real(self):
-        '''!!!STOP THIS TEST FROM FAILING!'''
-        print '\n!!!FIX: test_protection_change_real'
         test_cases = [';Q1[]AA2R1[]T!T1TTAA;',
                       ';Q2[]AA2R1[]T!T1AATTAA;',
                       ';Q2[]AA2R1[]T!TT!T1AATTTAA;',
@@ -448,16 +445,29 @@ class TestChangeSequenceLength(unittest.TestCase):
                       ';CAACQ3[]AA2L1[]T!T1T;;CAAC;;TAA;',
                       ';CAAC;;TAACCCC;;Q3[]AA2L1[]T!T1T;;CAAC;',
                       ]
-        for test in test_cases:
-            c = cell.Cell(test)
+        
+        for seq in test_cases:
+            c = cell.Cell(seq)
             c.read_seq(0)
             c.read_seq(13)
             c.run_all()
             pr_pos_before = set(c.pr_pos)
             c.reset_protected()
             pr_pos_next = set(c.pr_pos)
-            #self.assertEqual(pr_pos_before, pr_pos_next)
+            self.assertEqual(pr_pos_before, pr_pos_next)
             
+    def test_get_updated_position(self):
+        
+        tests = [([(0,10),(12, 15)], 12, 10),
+                 ([(0,5),(12, 15)], 12, 5),
+                 ([(0,5),(12, 15),(5,12)], 7, 10),]
+        
+        for remap, pos, exp in tests:
+            c = cell.Cell(';AAAAAAAAAAAAAAAAAAAAAAAAA;')
+            c.remap_positions(remap)
+            res = c.get_updated_position(pos)
+            self.assertEqual(res, exp)
+        
 class TestCellDisintegration(unittest.TestCase):
     def test_Z_unit(self):
         tests = [';Z1[]1;', ';Z150[]1;']

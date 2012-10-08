@@ -12,6 +12,11 @@ class Cell(object):
         self.is_top_cell = is_top_cell
         self.id, self.sequence, self.name = ind, sequence, name
         self.rounds = 0
+        
+        #a list with all remaps (changes in sequence), because read actions are
+        #are determined at beginning of round but sequence might change...
+        self.round_remaps = []
+        
         self.pr_pos = []
         self.target_sequences, self.partner_target_sequences = [], []
         
@@ -319,10 +324,10 @@ class Cell(object):
         return requests
         
     def start_round(self):
-        '''Initializes the round, withdrawing life from units.
-        returns a list of actions that are requested this round'''
-        
+        '''Initializes the round & returns a list of actions that are requested this round'''
+
         self.rounds += 1
+        self.round_remaps = []
         
         #reset target sites
         self.reset_target()
@@ -418,6 +423,7 @@ class Cell(object):
                     self.sequence += tr['seq_export']
                 if tr['seq_import'] != None:
                     pos = tr['seq_import']
+                    self.remap_positions([(0, pos[0]),(pos[1], len(self.sequence))])
                     self.sequence = self.sequence[:pos[0]] + self.sequence[pos[1]:]
                 if tr['unit_export'] != None:
                     self.add_unit(tr['unit_export'])
@@ -601,6 +607,8 @@ class Cell(object):
     
     def read_seq(self, start = 0, energy_per_unit = 0, adress = False):
         '''Parse a sequence into unit(s) and add to pool'''
+        #update start position (this is necessary because some unit actions move sequence around)
+        start = self.get_updated_position(start)
         
         if adress != (self.id,) and adress != False:
             adress = list(adress)
@@ -845,17 +853,47 @@ class Cell(object):
                     new_pos = (pos, pos + end -1)
                     self.pr_pos.append(new_pos)
     
-    def change_sequence_length(self, start, length_diff, end=-1):
-        '''Moves translation start positions and protected sites according to length_diff'''
-        if end == -1:
-            end = len(self.sequence)
+    def remap_positions(self, new_sequence_coord):
+        remap_pos = []
+        start_pos = 0
+        for seq in new_sequence_coord:
+            if seq[0] != -1:
+                remap_pos.append((start_pos, seq))
+                start_pos += seq[1] - seq[0]
+            #introduce a spacer
+            else:
+                start_pos += seq[1]
         
-        #update protected
+        self.round_remaps.append(remap_pos)
+        
+        # remap protected sequences here; read positions will be remaped 
+        # just before an action
         for i in range(len(self.pr_pos)):
-            pr = self.pr_pos[i]
-            if start <= pr[0] <= end and start <= pr[1] <= end:
-                self.pr_pos[i] = (pr[0] + length_diff, pr[1] + length_diff)
-        #update read positions
+            start, end = self.pr_pos[i]
+            found = False
+            for start_pos, seq in remap_pos:
+                if seq[0] <= start <= seq[1] and seq[0] <= end <= seq[1]:
+                    start = start_pos + start - seq[0]
+                    end = start_pos + end - seq[0]
+                    self.pr_pos[i] = (start, end)
+                    found = True
+                    break
+            if not found:
+                del self.pr_pos[i]
+                
+    def get_updated_position(self, position):
+        for remap in self.round_remaps:
+            found = False
+            for start_pos, seq in remap:
+                if seq[0] <= position <= seq[1]:
+                    position = start_pos + position - seq[0]
+                    found = True
+                    break
+            if not found:
+                #This measn the position got eliminated dduring the round
+                return False
+            
+        return position
        
     def pos_protected(self, position):
         '''Checks if an available protection unit inhibits action at position'''
@@ -991,8 +1029,8 @@ class Cell(object):
                     if not self.pos_protected(oc):
                         #Blunt cut site
                         if pos2 == -1:
+                            self.remap_positions([(0, oc+pos1),(-1, 2),(oc+pos1, len(self.sequence))])
                             self.sequence = self.sequence[:oc+pos1] + ';;' + self.sequence[oc+pos1:]
-                            self.change_sequence_length(oc+pos1, 2)
                             found = True
                         #overlapping end cut site
                         else:
@@ -1026,12 +1064,13 @@ class Cell(object):
                             #Not too much overlapp
                             if len_seq1 > overlap_tot1 and len_seq2 > overlap_tot2:
                                 overlap = str(overlap)
+                                
+                                #remap positions
+                                len_new = (len(overlap) * 2) + 2
+                                self.remap_positions([(0, oc+pos1),(-1, len_new),(oc+pos2, len(self.sequence))])
+                                
                                 #Create overlapping ends 
                                 self.sequence = backward + ';' + overlap + ';' + overlap + forward
-                                #length of introduced sequence:
-                                len_diff = 2 + 2 * len(overlap)
-                                position = len(backward)
-                                self.change_sequence_length(position, len_diff)
                                 found = True
                     else:
                         black_list.append(oc)
@@ -1078,8 +1117,8 @@ class Cell(object):
             sit = random.random()
             #delete position
             if sit < 0.3333:
+                self.remap_positions([(0, pos),(pos+1, len(self.sequence))])
                 self.sequence = self.sequence[:pos] + self.sequence[pos+1:]
-                self.change_sequence_length(pos, -1)
                 return 1
             
             #choose random letter
@@ -1105,12 +1144,12 @@ class Cell(object):
                 
                 #insert a random letter
                 if sit < 0.6666:
+                    self.remap_positions([(0, pos),(-1, len(new_letter)),(pos, len(self.sequence))])
                     self.sequence = self.sequence[:pos] + new_letter + self.sequence[pos:]
                 #change a letter
                 elif 0.6666 < sit:
+                    self.remap_positions([(0, pos),(-1, len(new_letter)),(pos+1, len(self.sequence))])
                     self.sequence = self.sequence[:pos] + new_letter + self.sequence[pos+1:]
-                    
-                self.change_sequence_length(pos, len(new_letter))
                 
                 return 1
             
@@ -1185,9 +1224,12 @@ class Cell(object):
                         if overlap == 0:
                             a = self.sequence[:end2]
                             c = self.sequence[end2+1:start1]
+                            self.remap_positions([(0, end2),(start1+1, len(self.sequence)),(end2+1, start1)])
                         else:
                             a = self.sequence[:end2+len_before]
                             c = self.sequence[end2+len(sel2[1]):start1-1]
+                            self.remap_positions([(0, end2+len_before),(start1+1, len(self.sequence)),
+                                                  (end2+len(sel2[1]), start1-1)])
                             
                         self.sequence = a + b + c
                         
@@ -1197,11 +1239,14 @@ class Cell(object):
                             b = self.sequence[end1+1:end2]
                             c = self.sequence[start1+1:end1+1]
                             d = self.sequence[end2+1:]
+                            self.remap_positions([(0, start1), (end1+1, end2), (start1+1, end1+1), (end2+1, len(self.sequence))])
                         else:
                             a = self.sequence[:start1-1]
                             b = self.sequence[end1:end2+len_before]
                             c = self.sequence[start1+1:end1]
                             d = self.sequence[end2+len(sel2[1]):]
+                            self.remap_positions([(0, start1-1), (end1, end2+len_before), (start1+1, end1), 
+                                                  (end2+len(sel2[1]), len(self.sequence))])
                         
                         self.sequence = a + b + c + d 
                         
@@ -1358,7 +1403,7 @@ class Cell(object):
         else:
             return 0
             
-        while count < 25:
+        while count < 15:
             count += 1
             occ = self.find_occurences(mode, 0, length, target, 1)
             if len(occ) > 0:
@@ -1371,31 +1416,32 @@ class Cell(object):
                 #search results in forward direction
                 res_forw = re.compile(target_forward).search(sequence[occ:], 1)
                 #search results in backward direction with inverted positions
-                start_pos = occ - back_rev.index(';') - 1
-                if not res_forw:
-                    return 0
-                
-                end_pos = occ + res_forw.start() + len(res_forw.groups()[0])
-                new_sequence = sequence[start_pos : end_pos]
-                old_seq = sequence[:start_pos] + sequence[end_pos:]
-                if old_seq:
-                    if old_seq[len(old_seq)-1] != ';':
-                        end_pos += 1
-                
-                if mode == 'ext':
-                    #add new sequence to own sequence
-                    self.sequence += new_sequence
-                            
-                    #remove from top cell
-                    self.transported['seq_import'] = (start_pos, end_pos,)
-                    return 1
-                
-                elif mode == 'own':
-                    #remove sequence from own sequence
-                    self.sequence = old_seq
-                
-                    #export in partner cell
-                    self.transported['seq_export'] = new_sequence
+                if res_forw:
+                    start_pos = occ - back_rev.index(';') - 1
+                    
+                    end_pos = occ + res_forw.start() + len(res_forw.groups()[0])
+                    new_sequence = sequence[start_pos : end_pos]
+                    old_seq = sequence[:start_pos] + sequence[end_pos:]
+                    if old_seq:
+                        if old_seq[len(old_seq)-1] != ';':
+                            end_pos += 1
+                    
+                    if mode == 'ext':
+                        #add new sequence to own sequence
+                        self.sequence += new_sequence
+                                
+                        #remove from top cell
+                        self.transported['seq_import'] = (start_pos, end_pos,)
+                        return 1
+                    
+                    elif mode == 'own':
+                        #remap positions
+                        self.remap_positions([(0, start_pos),(end_pos, len(self.sequence))])
+                        #remove sequence from own sequence
+                        self.sequence = old_seq
+                    
+                        #export in partner cell
+                        self.transported['seq_export'] = new_sequence
         return 0
                 
     def delete_seq(self, unit):
@@ -1449,15 +1495,7 @@ class Cell(object):
                     
                     for i in to_del:
                         del self.pr_pos[i]
-                     
-                    #!!! update positions   
-                    #for action_id in self.round_actions.keys():
-                    #    action = self.round_actions[action_id]
-                    #    if action[0] == 'read' and start_pos < action[1] < end_pos:
-                    #        del self.round_actions[action_id]
-                            
-                    #update length
-                    self.change_sequence_length(start_pos, end_pos - start_pos)
+                    
                     
                     return 1
                 
