@@ -470,7 +470,7 @@ class TestRemapPositions(unittest.TestCase):
         
 class TestCellDisintegration(unittest.TestCase):
     def test_Z_unit(self):
-        tests = [';Z1[]1;', ';Z150[]1;']
+        tests = [';Z1[]1;', ';Z150[]1;', ';Z3(aa,a_a)[]1;']
         
         for seq in tests:
             c = cell.Cell()
@@ -554,14 +554,15 @@ class TestActionList(unittest.TestCase):
             
     def test_requested_reads(self):
         test_cases = [
-                      (';N10[]1F1[]GX!AT1SXXP4GCATXXXSR2[]C!C3;', [22, 22, 22, 22, 22])
+                      (';N10[]1F1[]GX!AT1SXXP4GCATXXXSR2[]C!C3;', [22, 22, 22, 22, 22]),
+                      (';N10[]1F1[]GX!AT1SXXXXP4GCATXP3CCXXSR2[]C!C3;', [24, 24, 24, 24, 24, 31, 31, 31])
                       ]
         
         for seq, exp_reads in test_cases:
             c= cell.Cell(seq)
             c.read_seq(0)
             res = c.get_requested_reads()
-            self.assertEqual(res, exp_reads)
+            self.assertEqual(Counter(res), Counter(exp_reads))
 
 class TestProbabilistic(unittest.TestCase):
             
