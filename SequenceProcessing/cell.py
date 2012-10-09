@@ -1096,7 +1096,7 @@ class Cell(object):
             units.append(str(i))
         
         tags = []
-        tag_string = 'abcdefghijklmnopqrstuvwxyz_'
+        tag_string = 'abcdefghijklmnopqrstuvwxyz_ '
         for letter in tag_string:
             tags.append(letter)
             
@@ -1137,6 +1137,7 @@ class Cell(object):
                         new_letter = ';;'
                     #a contained sequence
                     elif 0.93333 < letter_type < 0.96666:
+                        letters.append('')
                         new_letter = '['+ random.choice(letters) + ']'
                     #a tag
                     else:
@@ -1150,9 +1151,7 @@ class Cell(object):
                 elif 0.6666 < sit:
                     self.remap_positions([(0, pos),(-1, len(new_letter)),(pos+1, len(self.sequence))])
                     self.sequence = self.sequence[:pos] + new_letter + self.sequence[pos+1:]
-                
                 return 1
-            
         return 0
         
     def ligate_seq(self, unit):
