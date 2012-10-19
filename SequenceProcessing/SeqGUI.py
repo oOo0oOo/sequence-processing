@@ -8,8 +8,7 @@ import time
 from parse import SequenceError, SequenceWarning
 
 class PreferencesPopup(wx.Dialog):
-    '''This is a dialog to change the preferences of a cell, it takes a 
-    cell as inpput and parses uses the current parameters.'''
+    '''This is a dialog to change the preferences of a cell, it takes a cell as input.'''
      
     def __init__(self, cell):
         super(PreferencesPopup, self).__init__(None)
@@ -208,9 +207,6 @@ class ProgressPopup(wx.Frame):
         self.gauge.SetValue(self.cur_round)
 
 class SequenceTab(wx.Panel):
-    """
-    Sequence Tab.
-    """
     def __init__(self, parent):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
         msizer = wx.BoxSizer(wx.VERTICAL)
@@ -558,7 +554,7 @@ class SeqGUI(wx.Frame):
         
         self.Layout()
         
-        self.SetTitle('Sequence Processing 0.1')
+        self.SetTitle('Sequence Processing (simple molecular simulation)')
         self.Centre()
         self.Show()
 

@@ -229,6 +229,13 @@ class TestUnitCreation(unittest.TestCase):
                          'life': 3,'tags': ('a*a',)}]),
                       (';U-0.733[](**,b_t,a)3;', [{'type': 'U','action': -0.733,'energy': 0,
                                               'target': ('**', 'b_t', 'a'),'life': 3,'tags': tuple()}]),
+                      (';U15(the_transporter)[](*,**,***,****,*****,******,*******)2;', [{'type': 'U','action': 15,'energy': 0,
+                                              'target': ('*', '**', '***', '****', '*****', '******', '*******'),
+                                              'life': 2,'tags': ('the_transporter',)}]),
+                      
+                      (';U20[](*,**,***,****,*****,******,*******)2;', [{'type': 'U','action': 20,'energy': 0,
+                                              'target': ('*', '**', '***', '****', '*****', '******', '*******'),
+                                              'life': 2,'tags': ()}]),
                       
                       #conversion unit with multiple tags as target
                       (';V1/1(conversion_unit)[](substance_a)(substance_b)3;', 
@@ -396,8 +403,7 @@ class TestSubstances(unittest.TestCase):
             success = c.find_tags(to_remove, substances = True, remove = False)
             #self.assertEqual(success, res)
             self.assertEqual(before, c.substances.items())
-            
-            
+                      
     def test_substance_conversion(self):
         test_cases = [(';V1[](a,b)(c,d)1;', ('a', 'b'), ['c', 'd']), #substance conversion
                       (';V2[](a)(c,d)1;', ('a', 'a'), ['c', 'd', 'c', 'd']),
@@ -422,7 +428,6 @@ class TestSubstances(unittest.TestCase):
             sub = c.substances.values()
             self.assertEqual(sub, exp)
                 
-
 class TestRemapPositions(unittest.TestCase):
     def test_remap_protection(self):
         test_cases = [(';Q1[]AA2TTAACC;', [(0, 8), (10, 15)], [(8,9)]),
@@ -1008,8 +1013,19 @@ class TestTransportUnit(unittest.TestCase):
             c = cell.Cell()
             ind = c.new_sub_cell(seq)
             c.cells[ind].read_seq()
+            
+            units_before = len(c.cells[ind].units.values())
             c.run_all()
+            units_left = c.cells[ind].units.values()
+            
             self.assertEqual(c.units, units)
+            
+            if len(units_left) > 0:
+                self.assertEqual(len(units_left), 1)
+                self.assertEqual(units_left[0]['type'], 'U')
+            else:
+                self.assertEqual(len(units_left), 0)
+            
             
     def test_unit_import(self):
         test_cases = [(';R1(res)[]A!A10;', ';U-10[](res)1;', {1: {'type': 'R','action': 1,'energy': 0,'target': 'A!A','life': 9,'tags': ('res',)}}),
@@ -1024,23 +1040,27 @@ class TestTransportUnit(unittest.TestCase):
             c.cells[ind].read_seq()
             c.run_all()
             self.assertEqual(c.cells[ind].units, units)
+            self.assertEqual(c.units, {})
             
     def test_substance_export(self):
-        test_cases = [(';U10[](a)2;', ('a', 'a', 'a', 'a', 'a'), ['a', 'a', 'a', 'a', 'a'], []),
+        test_cases = [
+                      (';U10[](a)2;', ('a', 'a', 'a', 'a', 'a'), ['a', 'a', 'a', 'a', 'a'], []),
                       (';U10[](b**,a)2;', ('a', 'a', 'a', 'a', 'a'), ['a', 'a', 'a', 'a', 'a'], []),
                       (';U4[](*)2;', ('*', '*', '*', '*', '*'), ['*', '*', '*', '*'], ['*']),
                       (';U4[](*,**)2;', ('*', '**', '*', '**','***','abcd'), ['**', '**', '*', '*'], ['***', 'abcd']),
+                      (';U20[](*,**,***,****,*****,******)2;', ('*', '**', '***', '****','*****','******', '*******'), 
+                       ['*', '**', '***', '****','*****','******'], ['*******']),
                       ] 
         
-        for seq, subs, res, res1 in test_cases:
+        for seq, subs, target, origin in test_cases:
             c = cell.Cell()
             ind = c.new_sub_cell(seq)
             c.cells[ind].read_seq()
             c.cells[ind].add_subs(subs)
             c.run_all()
             
-            self.assertEqual(c.cells[ind].substances.values(), res1)
-            self.assertEqual(Counter(c.substances.values()), Counter(res))
+            self.assertEqual(c.cells[ind].substances.values(), origin)
+            self.assertEqual(Counter(c.substances.values()), Counter(target))
             
     def test_substance_import(self):
         test_cases = [(';U-6[](a)2;', ('a', 'a', 'a', 'a', 'a'), {0: 'a', 1: 'a', 2: 'a', 3: 'a', 4: 'a'}),

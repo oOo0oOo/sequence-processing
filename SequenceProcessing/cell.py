@@ -1547,20 +1547,25 @@ class Cell(object):
                 if self.units[ind]['type'] != 'V':
                     if self.units[ind]['target'] != '':
                         if type(self.units[ind]['target']) == tuple:
-                            if  self.units[ind]['target'][0] != '':
+                            if  len(self.units[ind]['target']) > 0:
                                 resp_str += ', Target: '
                                 for targ in self.units[ind]['target']:
-                                    resp_str += ', ' + targ
+                                    resp_str += targ + ', '
                             else:
                                 pass
                         else:
                             resp_str += ', Target: ' + self.units[ind]['target']
                 else:
                     resp_str += ', From: '
-                    for target in self.units[ind]['target'][0]:
-                        resp_str += target + ', '   
+                    try:
+                        needs = self.units[ind]['needs']
+                        for target in needs:
+                            resp_str += target + ', '   
+                    except KeyError:
+                        pass
+                    
                     resp_str += 'To: '
-                    for target in self.units[ind]['target'][1]:
+                    for target in self.units[ind]['target']:
                         resp_str += target + ', '
                     
                 resp_str += '\n'
