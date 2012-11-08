@@ -9,7 +9,7 @@ of elaborate systems.
 * More about the [sequence syntax](http://github.com/oOo0oOo/sequence-processing/wiki/Sequence-Syntax)
 * A list of [all units](http://github.com/oOo0oOo/sequence-processing/wiki/List-of-all-Units) currently implemented.
 
-####Dependencies:
+####Dependencies (install before running the program):
 
 * [Python 2.x](http://www.python.org/getit/)
 * [wxPython](http://wxpython.org/download.php)
