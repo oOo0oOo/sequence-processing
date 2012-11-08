@@ -12,7 +12,7 @@ of elaborate systems.
 ####Dependencies (install before running the program):
 
 * [Python 2.x](http://www.python.org/getit/)
-* [wxPython](http://wxpython.org/download.php)
+* [wxPython 2.8](http://wxpython.org/download.php)
 
 
 I'm only coding since half a year, so all constructive feedback is most welcome!
